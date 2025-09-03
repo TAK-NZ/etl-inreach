@@ -29,7 +29,7 @@ Configure `INREACH_MAP_SHARES` with your Garmin InReach MapShare URLs:
 ```
 
 #### Test Mode
-For development, testing or training without physical devices, enable test mode:
+For development, testing or training without physical devices, enable test mode (only available when `ENABLE_TEST_MODE = true` in build configuration):
 
 ```json
 {
@@ -74,6 +74,8 @@ For development, testing or training without physical devices, enable test mode:
 - `inReach Explorer`
 - `inReach SE+`
 - `inReach Messenger`
+
+**Note:** Test mode configuration options are only visible in the CloudTAK UI when the ETL is built with `ENABLE_TEST_MODE = true`. Production builds should set this to `false` to hide test functionality.
 
 ## Deployment
 
@@ -156,6 +158,30 @@ npm run build
 cp .env dist/
 node dist/task.js
 ```
+
+### Test Mode Configuration
+
+Test mode functionality can be enabled or disabled at build time by modifying the `ENABLE_TEST_MODE` constant in `task.ts`:
+
+```typescript
+// Build-time configuration - change to false for production builds
+const ENABLE_TEST_MODE = true;
+```
+
+**Development builds** (ENABLE_TEST_MODE = true):
+- TEST_MODE and TEST_DEVICES configuration options are available in the UI
+- Simulated device functionality is enabled
+- Suitable for development, testing, and training environments
+
+**Production builds** (ENABLE_TEST_MODE = false):
+- TEST_MODE and TEST_DEVICES configuration options are completely hidden
+- Test mode functionality is disabled and removed from the build
+- Reduces configuration complexity for production deployments
+
+**To create a production build:**
+1. Change `ENABLE_TEST_MODE = true` to `ENABLE_TEST_MODE = false` in `task.ts`
+2. Build and deploy as normal
+3. Test mode options will not appear in the CloudTAK configuration UI
 
 ## License
 
