@@ -5,6 +5,9 @@ import xml2js from 'xml2js';
 import ETL, { DataFlowType, SchemaType, handler as internal, local, InvocationType } from '@tak-ps/etl';
 import type { Event } from '@tak-ps/etl';
 
+// Build-time configuration - change to false for production builds
+const ENABLE_TEST_MODE = true;
+
 export interface Share {
     ShareId: string;
     CallSign?: string;
@@ -19,7 +22,8 @@ const EphemeralSchema = Type.Object({
         lastUpdate: Type.String({ format: 'date-time' }),
         currentAngle: Type.Optional(Type.Number()),
         stepCount: Type.Number({ default: 0 }),
-        wasEmergency: Type.Optional(Type.Boolean({ default: false }))
+        wasEmergency: Type.Optional(Type.Boolean({ default: false })),
+        lastSeen: Type.Optional(Type.String({ format: 'date-time' }))
     }))
 });
 
@@ -33,41 +37,47 @@ const Input = Type.Object({
         description: 'Inreach Share IDs to pull data from',
         display: 'table',
     })),
-    'TEST_MODE': Type.Boolean({
-        default: false,
-        description: 'Enable test mode with simulated devices'
+    'EMERGENCY_TIMEOUT_HOURS': Type.Number({
+        default: 6,
+        description: 'Hours after which to auto-cancel emergency alerts for offline devices'
     }),
-    'TEST_DEVICES': Type.Array(Type.Object({
-        IMEI: Type.String({ description: 'Simulated device IMEI' }),
-        Name: Type.String({ description: 'Device operator name' }),
-        DeviceType: Type.String({ 
-            description: 'Device model',
-            default: 'inReach Mini',
-            enum: ['inReach Mini', 'inReach Explorer', 'inReach SE+', 'inReach Messenger']
+    ...(ENABLE_TEST_MODE && {
+        'TEST_MODE': Type.Boolean({
+            default: false,
+            description: 'Enable test mode with simulated devices'
         }),
-        StartLat: Type.Number({ description: 'Starting latitude' }),
-        StartLon: Type.Number({ description: 'Starting longitude' }),
-        MovementPattern: Type.String({
-            description: 'Movement simulation pattern',
-            default: 'stationary',
-            enum: ['stationary', 'random_walk', 'circular', 'linear_path']
-        }),
-        Speed: Type.Number({ 
-            description: 'Movement speed in km/h',
-            default: 5
-        }),
-        EmergencyMode: Type.Boolean({
-            description: 'Simulate emergency activation',
-            default: false
-        }),
-        MessageInterval: Type.Number({
-            description: 'Minutes between simulated messages',
-            default: 10
-        }),
-        CoTType: Type.Optional(Type.String({ description: 'CoT type override', default: 'a-f-G' }))
-    }), {
-        default: [],
-        description: 'Test devices configuration'
+        'TEST_DEVICES': Type.Array(Type.Object({
+            IMEI: Type.String({ description: 'Simulated device IMEI' }),
+            Name: Type.String({ description: 'Device operator name' }),
+            DeviceType: Type.String({ 
+                description: 'Device model',
+                default: 'inReach Mini',
+                enum: ['inReach Mini', 'inReach Explorer', 'inReach SE+', 'inReach Messenger']
+            }),
+            StartLat: Type.Number({ description: 'Starting latitude' }),
+            StartLon: Type.Number({ description: 'Starting longitude' }),
+            MovementPattern: Type.String({
+                description: 'Movement simulation pattern',
+                default: 'stationary',
+                enum: ['stationary', 'random_walk', 'circular', 'linear_path']
+            }),
+            Speed: Type.Number({ 
+                description: 'Movement speed in km/h',
+                default: 5
+            }),
+            EmergencyMode: Type.Boolean({
+                description: 'Simulate emergency activation',
+                default: false
+            }),
+            MessageInterval: Type.Number({
+                description: 'Minutes between simulated messages',
+                default: 10
+            }),
+            CoTType: Type.Optional(Type.String({ description: 'CoT type override', default: 'a-f-G' }))
+        }), {
+            default: [],
+            description: 'Test devices configuration'
+        })
     }),
     'DEBUG': Type.Boolean({
         default: false,
@@ -259,7 +269,7 @@ export default class Task extends ETL {
     async control(): Promise<void> {
         const env = await this.env(Input);
 
-        if (env.TEST_MODE) {
+        if (ENABLE_TEST_MODE && env.TEST_MODE) {
             if (!env.TEST_DEVICES || env.TEST_DEVICES.length === 0) {
                 console.log('TEST_MODE enabled but no TEST_DEVICES configured');
                 await this.submit({ type: 'FeatureCollection', features: [] });
@@ -548,12 +558,19 @@ export default class Task extends ETL {
     }
 
     private async processAlerts(features: Static<typeof InputFeature>[], ephemeral: Static<typeof EphemeralSchema>): Promise<void> {
+        const env = await this.env(Input);
         const alertFeatures: Static<typeof InputFeature>[] = [];
+        const now = new Date();
+        const timeoutMs = env.EMERGENCY_TIMEOUT_HOURS * 60 * 60 * 1000;
+        
+        // Track which devices we've seen in this update
+        const seenDevices = new Set<string>();
         
         for (const feature of features) {
             const deviceKey = String(feature.properties.metadata.inreachIMEI);
             if (!deviceKey) continue;
             
+            seenDevices.add(deviceKey);
             const isCurrentlyEmergency = feature.properties.metadata.inreachEmergency === 'True';
             const wasEmergency = ephemeral.deviceStates[deviceKey]?.wasEmergency || false;
             
@@ -574,10 +591,45 @@ export default class Task extends ETL {
                     currentLon: coords[0],
                     lastUpdate: feature.properties.time,
                     stepCount: 0,
-                    wasEmergency: isCurrentlyEmergency
+                    wasEmergency: isCurrentlyEmergency,
+                    lastSeen: now.toISOString()
                 };
             } else {
                 ephemeral.deviceStates[deviceKey].wasEmergency = isCurrentlyEmergency;
+                ephemeral.deviceStates[deviceKey].lastSeen = now.toISOString();
+            }
+        }
+        
+        // Check for emergency timeout on offline devices
+        for (const [deviceKey, state] of Object.entries(ephemeral.deviceStates)) {
+            if (!state.wasEmergency || seenDevices.has(deviceKey)) continue;
+            
+            const lastSeen = new Date(state.lastSeen || state.lastUpdate);
+            const timeSinceLastSeen = now.getTime() - lastSeen.getTime();
+            
+            if (timeSinceLastSeen > timeoutMs) {
+                console.log(`TIMEOUT: Auto-canceling emergency for offline device ${deviceKey} (${Math.round(timeSinceLastSeen / 3600000)}h offline)`);
+                
+                // Create a synthetic feature for the timeout cancel
+                const cancelFeature: Static<typeof InputFeature> = {
+                    id: `inreach-${deviceKey}`,
+                    type: 'Feature',
+                    properties: {
+                        type: 'a-f-G',
+                        callsign: `Device ${deviceKey}`,
+                        time: now.toISOString(),
+                        start: now.toISOString(),
+                        remarks: 'Emergency timeout - device offline',
+                        metadata: { inreachIMEI: deviceKey }
+                    },
+                    geometry: {
+                        type: 'Point',
+                        coordinates: [state.currentLon, state.currentLat, 0]
+                    }
+                };
+                
+                alertFeatures.push(this.createEmergencyAlert(cancelFeature, 'b-a-o-can'));
+                state.wasEmergency = false;
             }
         }
         
