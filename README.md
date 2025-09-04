@@ -24,9 +24,16 @@ Configure `INREACH_MAP_SHARES` with your Garmin InReach MapShare URLs:
       "Password": "optional-password",
       "CoTType": "a-f-G"
     }
-  ]
+  ],
+  "EMERGENCY_TIMEOUT_HOURS": 6
 }
 ```
+
+**Emergency Alert System:**
+- Automatically generates `b-a-o-tbl` (911 Alert) CoTs when devices enter emergency mode
+- Generates `b-a-o-can` (Cancel Alert) CoTs when devices exit emergency mode
+- Auto-cancels emergency alerts after `EMERGENCY_TIMEOUT_HOURS` if device goes offline (default: 6 hours)
+- Emergency CoTs are separate from device position CoTs, following ATAK emergency handling standards
 
 #### Test Mode
 For development, testing or training without physical devices, enable test mode (only available when `ENABLE_TEST_MODE = true` in build configuration):
@@ -56,7 +63,7 @@ For development, testing or training without physical devices, enable test mode 
       "MovementPattern": "stationary",
       "Speed": 0,
       "EmergencyMode": true,
-      "MessageInterval": 5,
+      "MessageInterval": 1,
       "CoTType": "a-f-G"
     }
   ]
@@ -74,6 +81,15 @@ For development, testing or training without physical devices, enable test mode 
 - `inReach Explorer`
 - `inReach SE+`
 - `inReach Messenger`
+
+**Emergency Testing:**
+When `EmergencyMode: true` is set on a test device, it automatically cycles between emergency and normal states:
+- **Minutes 0-4**: Normal operation (`In Emergency: False`)
+- **Minutes 5-9**: Emergency active (`In Emergency: True`) → Generates `b-a-o-tbl` alert
+- **Minutes 10-14**: Emergency cancelled (`In Emergency: False`) → Generates `b-a-o-can` alert
+- **Minutes 15-19**: Emergency active again, and so on...
+
+This provides automatic testing of the complete emergency alert lifecycle without manual intervention.
 
 **Note:** Test mode configuration options are only visible in the CloudTAK UI when the ETL is built with `ENABLE_TEST_MODE = true`. Production builds should set this to `false` to hide test functionality.
 

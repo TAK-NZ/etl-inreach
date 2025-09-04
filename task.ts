@@ -172,7 +172,16 @@ export default class Task extends ETL {
         deviceState.lastUpdate = now.toISOString();
         
         const elevation = 100 + Math.random() * 50;
-        const styleId = device.EmergencyMode ? 'style_emergency' : 'style_test';
+        
+        // Auto-cycle emergency state every 5 minutes when EmergencyMode is true
+        let isEmergency = device.EmergencyMode;
+        if (device.EmergencyMode) {
+            const minutesSinceEpoch = Math.floor(now.getTime() / 60000);
+            const cyclePosition = Math.floor(minutesSinceEpoch / 5) % 2; // 0 or 1 every 5 minutes
+            isEmergency = cyclePosition === 1;
+        }
+        
+        const styleId = isEmergency ? 'style_emergency' : 'style_test';
         
         return `<?xml version="1.0" encoding="utf-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
@@ -239,13 +248,13 @@ export default class Task extends ETL {
             <value>True</value>
           </Data>
           <Data name="In Emergency">
-            <value>${device.EmergencyMode ? 'True' : 'False'}</value>
+            <value>${isEmergency ? 'True' : 'False'}</value>
           </Data>
           <Data name="Text">
-            <value>${device.EmergencyMode ? 'EMERGENCY - HELP NEEDED' : ''}</value>
+            <value>${isEmergency ? 'EMERGENCY - HELP NEEDED' : ''}</value>
           </Data>
           <Data name="Event">
-            <value>${device.EmergencyMode ? 'SOS activated' : 'Tracking interval received.'}</value>
+            <value>${isEmergency ? 'SOS activated' : 'Tracking interval received.'}</value>
           </Data>
           <Data name="Time UTC">
             <value>${now.toISOString()}</value>
@@ -574,6 +583,8 @@ export default class Task extends ETL {
             const isCurrentlyEmergency = feature.properties.metadata.inreachEmergency === 'True';
             const wasEmergency = ephemeral.deviceStates[deviceKey]?.wasEmergency || false;
             
+
+            
             // Create separate emergency alert CoT events
             if (!wasEmergency && isCurrentlyEmergency) {
                 console.log(`ALERT: Emergency started for ${feature.properties.callsign}`);
@@ -583,7 +594,7 @@ export default class Task extends ETL {
                 alertFeatures.push(this.createEmergencyAlert(feature, 'b-a-o-can'));
             }
             
-            // Update emergency state
+            // Update device state (but emergency state is updated after alert processing)
             const coords = feature.geometry.coordinates as number[];
             if (!ephemeral.deviceStates[deviceKey]) {
                 ephemeral.deviceStates[deviceKey] = {
@@ -591,13 +602,15 @@ export default class Task extends ETL {
                     currentLon: coords[0],
                     lastUpdate: feature.properties.time,
                     stepCount: 0,
-                    wasEmergency: isCurrentlyEmergency,
+                    wasEmergency: false, // Will be updated below
                     lastSeen: now.toISOString()
                 };
             } else {
-                ephemeral.deviceStates[deviceKey].wasEmergency = isCurrentlyEmergency;
                 ephemeral.deviceStates[deviceKey].lastSeen = now.toISOString();
             }
+            
+            // Update emergency state AFTER alert processing
+            ephemeral.deviceStates[deviceKey].wasEmergency = isCurrentlyEmergency;
         }
         
         // Check for emergency timeout on offline devices
