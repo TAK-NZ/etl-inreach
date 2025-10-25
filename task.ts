@@ -1,9 +1,9 @@
-import type { InputFeatureCollection, InputFeature } from '@tak-ps/etl';
 import type { Static, TSchema } from '@sinclair/typebox';
 import { Type } from '@sinclair/typebox';
 import xml2js from 'xml2js';
 import ETL, { DataFlowType, SchemaType, handler as internal, local, InvocationType } from '@tak-ps/etl';
 import type { Event } from '@tak-ps/etl';
+import { Feature } from '@tak-ps/etl';
 
 // Build-time configuration - change to false for production builds
 const ENABLE_TEST_MODE = true;
@@ -300,7 +300,7 @@ export default class Task extends ETL {
             }
             
             console.log(`TEST_MODE: Simulating ${activeDevices.length} of ${env.TEST_DEVICES.length} devices`);
-            const fc: Static<typeof InputFeatureCollection> = { type: 'FeatureCollection', features: [] };
+            const fc: Static<typeof Feature.InputFeatureCollection> = { type: 'FeatureCollection', features: [] };
             
             for (const device of activeDevices) {
                 const deviceKey = device.IMEI;
@@ -338,8 +338,8 @@ export default class Task extends ETL {
             await this.setEphemeral(ephemeral);
             console.log(`TEST_MODE: Saved ephemeral state for ${Object.keys(ephemeral.deviceStates).length} devices`);
             
-            const emergencyCount = fc.features.filter(f => f.properties.type === 'b-a-o-tbl').length;
-            const cancelCount = fc.features.filter(f => f.properties.type === 'b-a-o-can').length;
+            const emergencyCount = fc.features.filter((f: Static<typeof Feature.InputFeature>) => f.properties.type === 'b-a-o-tbl').length;
+            const cancelCount = fc.features.filter((f: Static<typeof Feature.InputFeature>) => f.properties.type === 'b-a-o-can').length;
             console.log(`TEST_MODE: Generated ${fc.features.length} features with ${emergencyCount} emergency alerts and ${cancelCount} cancel alerts`);
             await this.submit(fc);
             return;
@@ -348,9 +348,9 @@ export default class Task extends ETL {
         if (!env.INREACH_MAP_SHARES) throw new Error('No INREACH_MAP_SHARES Provided');
         if (!Array.isArray(env.INREACH_MAP_SHARES)) throw new Error('INREACH_MAP_SHARES must be an array');
 
-        const obtains: Array<Promise<Static<typeof InputFeature>[]>> = [];
+        const obtains: Array<Promise<Static<typeof Feature.InputFeature>[]>> = [];
         for (const share of env.INREACH_MAP_SHARES) {
-            obtains.push((async (share: Share): Promise<Static<typeof InputFeature>[]> => {
+            obtains.push((async (share: Share): Promise<Static<typeof Feature.InputFeature>[]> => {
                 try {
                     if (share.ShareId.startsWith('https://')) {
                         share.ShareId = new URL(share.ShareId).pathname.replace(/^\//, '');
@@ -399,7 +399,7 @@ export default class Task extends ETL {
             })(share))
         }
 
-        const fc: Static<typeof InputFeatureCollection> = {
+        const fc: Static<typeof Feature.InputFeatureCollection> = {
             type: 'FeatureCollection',
             features: []
         }
@@ -420,15 +420,15 @@ export default class Task extends ETL {
         
         await this.setEphemeral(ephemeral);
         
-        const emergencyCount = fc.features.filter(f => f.properties.type === 'b-a-o-tbl').length;
-        const cancelCount = fc.features.filter(f => f.properties.type === 'b-a-o-can').length;
+        const emergencyCount = fc.features.filter((f: Static<typeof Feature.InputFeature>) => f.properties.type === 'b-a-o-tbl').length;
+        const cancelCount = fc.features.filter((f: Static<typeof Feature.InputFeature>) => f.properties.type === 'b-a-o-can').length;
         console.log(`ok - submitting ${totalFeatures} total features with ${emergencyCount} emergency alerts and ${cancelCount} cancel alerts`);
         await this.submit(fc);
     }
 
-    private async processKML(body: string, share: Share): Promise<Static<typeof InputFeature>[]> {
-        const featuresmap: Map<string, Static<typeof InputFeature>> = new Map();
-        const features: Static<typeof InputFeature>[] = [];
+    private async processKML(body: string, share: Share): Promise<Static<typeof Feature.InputFeature>[]> {
+        const featuresmap: Map<string, Static<typeof Feature.InputFeature>> = new Map();
+        const features: Static<typeof Feature.InputFeature>[] = [];
 
         if (!body.trim()) return features;
 
@@ -513,7 +513,7 @@ export default class Task extends ETL {
                 extended['Incident Id'] ? `Incident: ${extended['Incident Id']}` : null
             ].filter(Boolean).join('\n');
             
-            const feat: Static<typeof InputFeature> = {
+            const feat: Static<typeof Feature.InputFeature> = {
                 id,
                 type: 'Feature',
                 properties: {
@@ -566,9 +566,9 @@ export default class Task extends ETL {
         return features;
     }
 
-    private async processAlerts(features: Static<typeof InputFeature>[], ephemeral: Static<typeof EphemeralSchema>): Promise<void> {
+    private async processAlerts(features: Static<typeof Feature.InputFeature>[], ephemeral: Static<typeof EphemeralSchema>): Promise<void> {
         const env = await this.env(Input);
-        const alertFeatures: Static<typeof InputFeature>[] = [];
+        const alertFeatures: Static<typeof Feature.InputFeature>[] = [];
         const now = new Date();
         const timeoutMs = env.EMERGENCY_TIMEOUT_HOURS * 60 * 60 * 1000;
         
@@ -624,7 +624,7 @@ export default class Task extends ETL {
                 console.log(`TIMEOUT: Auto-canceling emergency for offline device ${deviceKey} (${Math.round(timeSinceLastSeen / 3600000)}h offline)`);
                 
                 // Create a synthetic feature for the timeout cancel
-                const cancelFeature: Static<typeof InputFeature> = {
+                const cancelFeature: Static<typeof Feature.InputFeature> = {
                     id: `inreach-${deviceKey}`,
                     type: 'Feature',
                     properties: {
@@ -650,7 +650,7 @@ export default class Task extends ETL {
         features.push(...alertFeatures);
     }
     
-    private createEmergencyAlert(deviceFeature: Static<typeof InputFeature>, alertType: string): Static<typeof InputFeature> {
+    private createEmergencyAlert(deviceFeature: Static<typeof Feature.InputFeature>, alertType: string): Static<typeof Feature.InputFeature> {
         const alertId = `${deviceFeature.id}-9-1-1`;
         const isCancel = alertType === 'b-a-o-can';
         
