@@ -13,6 +13,7 @@ export interface Share {
     CallSign?: string;
     Password?: string;
     CoTType?: string;
+    IconsetPath?: string;
 }
 
 const EphemeralSchema = Type.Object({
@@ -32,7 +33,8 @@ const Input = Type.Object({
         ShareId: Type.String({ description: 'Garmin Inreach Share ID or URL' }),
         CallSign: Type.Optional(Type.String({ description: 'Human Readable Name of the Operator - Used as the callsign in TAK' })),
         Password: Type.Optional(Type.String({ description: 'Optional: Garmin Inreach MapShare Password' })),
-        CoTType: Type.Optional(Type.String({ description: 'CoT type override', default: 'a-f-G' }))
+        CoTType: Type.Optional(Type.String({ description: 'CoT type override', default: 'a-f-G' })),
+        IconsetPath: Type.Optional(Type.String({ description: 'Custom icon path (e.g., Lifelines/communications_infrastructure-gray-halo.png)' }))
     }, {
         description: 'Inreach Share IDs to pull data from',
         display: 'table',
@@ -73,7 +75,8 @@ const Input = Type.Object({
                 description: 'Minutes between simulated messages',
                 default: 10
             }),
-            CoTType: Type.Optional(Type.String({ description: 'CoT type override', default: 'a-f-G' }))
+            CoTType: Type.Optional(Type.String({ description: 'CoT type override', default: 'a-f-G' })),
+            IconsetPath: Type.Optional(Type.String({ description: 'Custom icon path (e.g., Lifelines/communications_infrastructure-gray-halo.png)' }))
         }), {
             default: [],
             description: 'Test devices configuration'
@@ -117,7 +120,7 @@ export default class Task extends ETL {
         }
     }
 
-    private generateTestKML(device: { IMEI: string; Name: string; DeviceType: string; StartLat: number; StartLon: number; MovementPattern: string; Speed: number; EmergencyMode: boolean; MessageInterval: number; CoTType?: string }, deviceState: Static<typeof EphemeralSchema>['deviceStates'][string]): string {
+    private generateTestKML(device: { IMEI: string; Name: string; DeviceType: string; StartLat: number; StartLon: number; MovementPattern: string; Speed: number; EmergencyMode: boolean; MessageInterval: number; CoTType?: string; IconsetPath?: string }, deviceState: Static<typeof EphemeralSchema>['deviceStates'][string]): string {
         const now = new Date();
         const messageId = Math.floor(Math.random() * 999999999);
         
@@ -326,7 +329,7 @@ export default class Task extends ETL {
                 const newState = ephemeral.deviceStates[deviceKey];
                 console.log(`TEST_MODE: Device ${device.Name} moved to ${newState.currentLat.toFixed(6)}, ${newState.currentLon.toFixed(6)} (${device.MovementPattern})`);
                 
-                const features = await this.processKML(testKML, { ShareId: device.IMEI, CallSign: device.Name, CoTType: device.CoTType });
+                const features = await this.processKML(testKML, { ShareId: device.IMEI, CallSign: device.Name, CoTType: device.CoTType, IconsetPath: device.IconsetPath });
                 features.forEach(feature => {
                     feature.properties.remarks += '\n\nNote: Simulated Device';
                 });
@@ -523,6 +526,7 @@ export default class Task extends ETL {
                     callsign: share.CallSign,
                     time: timestamp.toISOString(),
                     start: timestamp.toISOString(),
+                    stale: new Date(timestamp.getTime() + 15 * 60 * 1000).toISOString(),
                     remarks,
                     links: [{
                         uid: id,
@@ -550,6 +554,12 @@ export default class Task extends ETL {
                     coordinates: coords
                 }
             };
+
+            // Add custom icon configuration if provided
+            if (share.IconsetPath) {
+                // Format: iconset-uuid:path (e.g., "de450cbf-2ffc-47fb-bd2b-ba2db89b035e:Lifelines/communications_infrastructure-gray-halo.png")
+                (feat.properties as Record<string, unknown>).icon = `de450cbf-2ffc-47fb-bd2b-ba2db89b035e:${share.IconsetPath}`;
+            }
 
             if (featuresmap.has(String(feat.id))) {
                 const existing = featuresmap.get(String(feat.id));
@@ -681,6 +691,8 @@ export default class Task extends ETL {
             geometry: deviceFeature.geometry
         };
     }
+
+
 }
 
 await local(await Task.init(import.meta.url), import.meta.url);

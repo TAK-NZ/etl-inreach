@@ -22,10 +22,23 @@ Configure `INREACH_MAP_SHARES` with your Garmin InReach MapShare URLs:
       "ShareId": "your-share-id-or-url",
       "CallSign": "Operator Name",
       "Password": "optional-password",
-      "CoTType": "a-f-G"
+      "CoTType": "a-f-G",
+      "IconsetPath": "Lifelines/communications_infrastructure-gray-halo.png"
     }
   ],
   "EMERGENCY_TIMEOUT_HOURS": 6
+}
+```
+
+**Custom Icons:**
+- `IconsetPath`: Path to custom icon within an iconset (e.g., "Lifelines/communications_infrastructure-gray-halo.png")
+
+**Example with Custom Icon:**
+```json
+{
+  "ShareId": "your-share-id",
+  "CallSign": "Communications Team",
+  "IconsetPath": "Lifelines/communications_infrastructure-gray-halo.png"
 }
 ```
 
@@ -52,7 +65,8 @@ For development, testing or training without physical devices, enable test mode 
       "Speed": 5,
       "EmergencyMode": false,
       "MessageInterval": 10,
-      "CoTType": "a-f-G"
+      "CoTType": "a-f-G",
+      "IconsetPath": "Lifelines/communications_infrastructure-gray-halo.png"
     },
     {
       "IMEI": "300434030910341",
@@ -64,7 +78,8 @@ For development, testing or training without physical devices, enable test mode 
       "Speed": 0,
       "EmergencyMode": true,
       "MessageInterval": 1,
-      "CoTType": "a-f-G"
+      "CoTType": "a-f-G",
+      "IconsetPath": "Lifelines/communications_infrastructure-gray-halo.png"
     }
   ]
 }
