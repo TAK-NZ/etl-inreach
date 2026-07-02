@@ -165,8 +165,6 @@ export default class Task extends ETL {
             default: {
                 lat += (Math.random() - 0.5) * 0.00001;
                 lon += (Math.random() - 0.5) * 0.00001;
-                velocity = 0;
-                course = 0;
             }
         }
         
@@ -394,9 +392,11 @@ export default class Task extends ETL {
 
 
 
+                    if (body === undefined) throw new Error('No response body received');
                     return await this.processKML(body, share);
                 } catch (err) {
-                    console.error(`FEED: ${share.CallSign}: ${err.message || err}`);
+                    const errMsg = err instanceof Error ? err.message : String(err);
+                    console.error(`FEED: ${share.CallSign}: ${errMsg}`);
                     return [];
                 }
             })(share))
@@ -439,7 +439,8 @@ export default class Task extends ETL {
         try {
             xml = await xml2js.parseStringPromise(body);
         } catch (error) {
-            throw new Error(`XML Parse Error: ${error.message}`);
+            const msg = error instanceof Error ? error.message : String(error);
+            throw new Error(`XML Parse Error: ${msg}`, { cause: error });
         }
         
         const kmlRoot = xml.kml || xml['kml'] || Object.values(xml)[0];
@@ -490,7 +491,8 @@ export default class Task extends ETL {
                     continue;
                 }
             } catch (error) {
-                console.warn(`Timestamp parse error for ${share.ShareId}: ${error.message}`);
+                const msg = error instanceof Error ? error.message : String(error);
+                console.warn(`Timestamp parse error for ${share.ShareId}: ${msg}`);
                 continue;
             }
 
@@ -562,8 +564,8 @@ export default class Task extends ETL {
             }
 
             if (featuresmap.has(String(feat.id))) {
-                const existing = featuresmap.get(String(feat.id));
-                if (new Date(feat.properties.time) > new Date(existing.properties.time)) {
+                const existing = featuresmap.get(String(feat.id))!;
+                if (new Date(feat.properties.time!) > new Date(existing.properties.time!)) {
                     featuresmap.set(String(feat.id), feat);
                 }
             } else {
@@ -586,11 +588,11 @@ export default class Task extends ETL {
         const seenDevices = new Set<string>();
         
         for (const feature of features) {
-            const deviceKey = String(feature.properties.metadata.inreachIMEI);
+            const deviceKey = String(feature.properties.metadata?.inreachIMEI);
             if (!deviceKey) continue;
             
             seenDevices.add(deviceKey);
-            const isCurrentlyEmergency = feature.properties.metadata.inreachEmergency === 'True';
+            const isCurrentlyEmergency = feature.properties.metadata?.inreachEmergency === 'True';
             const wasEmergency = ephemeral.deviceStates[deviceKey]?.wasEmergency || false;
             
 
@@ -610,7 +612,7 @@ export default class Task extends ETL {
                 ephemeral.deviceStates[deviceKey] = {
                     currentLat: coords[1],
                     currentLon: coords[0],
-                    lastUpdate: feature.properties.time,
+                    lastUpdate: feature.properties.time ?? new Date().toISOString(),
                     stepCount: 0,
                     wasEmergency: false, // Will be updated below
                     lastSeen: now.toISOString()
