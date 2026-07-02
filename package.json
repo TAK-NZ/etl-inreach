@@ -2,7 +2,7 @@
     "name": "etl-inreach",
     "type": "module",
     "prviate": true,
-    "version": "1.0.0",
+    "version": "1.2.1",
     "description": "",
     "main": "task.ts",
     "scripts": {
@@ -13,15 +13,15 @@
     "author": "Christian Elsen <chris@elsen.nz>",
     "license": "AGPL-3.0-only",
     "devDependencies": {
-        "@eslint/js": "^9.19.0",
-        "@types/xml2js": "^0.4.11",
-        "eslint": "^9.0.0",
-        "typescript": "^5.0.4",
-        "typescript-eslint": "^8.0.0"
+        "@eslint/js": "^10.0.1",
+        "@types/xml2js": "^0.4.14",
+        "eslint": "^10.6.0",
+        "typescript": "^6.0.3",
+        "typescript-eslint": "^8.62.1"
     },
     "dependencies": {
-        "@sinclair/typebox": "^0.34.0",
-        "@tak-ps/etl": "^9.22.0",
-        "xml2js": "^0.6.0"
+        "@sinclair/typebox": "^0.34.49",
+        "@tak-ps/etl": "^10.8.0",
+        "xml2js": "^0.6.2"
     }
 }
