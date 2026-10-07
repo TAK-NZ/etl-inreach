@@ -10,9 +10,20 @@
 
 ## Version History
 
+### v1.3.0 - 2026-10-07
+- :tada: Add a `capabilities.json` manifest so CloudTAK can read the task's requirements from the image. It declares a single required permission, `feature:submit` (the only CloudTAK API call that publishes data is `submit()`; `env()` and the ephemeral state calls are not gated by a permission), 1024 MB memory / 120 s timeout, and a default `rate(1 minute)` schedule. The one minute default keeps the minute-aligned `TEST_MODE` device simulation (`MessageInterval`) working as before. It is validated against `StaticCapabilitiesSchema` from `@tak-ps/etl`, and a test guards it in CI
+- :rocket: Build and push the image with `docker buildx` in the demo and production deploy jobs, embedding `capabilities.json` as the `com.cloudtak.capabilities` OCI annotation, with `docker/setup-buildx-action@v4` providing the `docker-container` builder the annotation needs. The `docker build` / `docker tag` / `docker push` sequence is replaced by a single `docker buildx build`. The image build and contents were checked locally with a plain `docker build`; the buildx annotation push itself has not been run against ECR or checked in the demo environment
+- :pencil2: Deliberately NOT adopting the `cloudtak-etl` CLI from `@tak-ps/etl` for the build and push: its `bin/build.ts` hardcodes the destination ECR repository as `tak-vpc-<Environment>-cloudtak-tasks`, which does not match the `<stackname>-etltasks` repository used by TAK.NZ base-infra. The existing lookup of the repository through the `EcrEtlTasksRepoArn` CloudFormation export is kept unchanged
+- :white_check_mark: Add a basic test suite (`npm test`, `node:test` run through `tsx`) covering the task's static config, input and output schemas and the manifest; the `lint` script now also covers `test/`. `npm test` was previously `exit 0`
+- :rocket: Require Node 24 (`engines` `>= 24`), and use Node 24 in the lint and deploy workflows (both were still on Node 18), matching the Lambda base image
+- :arrow_up: Update dependencies within their existing ranges: `@tak-ps/etl` 10.22.2, `eslint` 10.12.0 and `typescript-eslint` 8.71.1, and add `tsx` ^4.23.15 for the test runner. `npm audit` now reports 0 vulnerabilities (7 before: 3 moderate, 3 high, 1 critical). `typescript` stays on 6.0.3 as `typescript-eslint` still limits supported versions to below 6.1.0
+- :rocket: Add a `.dockerignore` so `.git`, `.github`, `node_modules`, `dist`, `test`, `docs`, `.env*` and markdown files are kept out of the image build context. `capabilities.json`, `task.ts`, `package*.json` and `tsconfig.json` stay in the context
+- :rocket: Use `docker/setup-buildx-action` v4 in the deploy jobs, in line with the Node.js 24 action updates in the entries below. Not yet run in CI on this version
 ### v5.1.0 - 2024-08-04
 
 - :arrow_up: Update Core Deps
+- :arrow_up: Update GitHub Actions to releases that run on Node.js 24, clearing the Node.js 20 deprecation warnings: `actions/checkout` v7, `actions/setup-node` v7 and `aws-actions/configure-aws-credentials` v6. `aws-actions/amazon-ecr-login` v2 already runs on Node.js 24. Not yet run in CI on these versions
+- :rocket: Pin the workflow runners to `ubuntu-24.04` instead of `ubuntu-latest`, so the `ubuntu-latest` migration to Ubuntu 26 (starting October 19, 2026) does not change the build environment unannounced
 
 ### v5.0.0 - 2024-07-02
 
