@@ -115,6 +115,7 @@ Deployment into the CloudTAK environment for ETL tasks is done via automatic rel
 Github actions will build and push docker releases on every version tag which can then be automatically configured via the
 CloudTAK API.
 
+`capabilities.json` in the repository root is the task's CloudTAK manifest. It declares the required permissions, memory and timeout, and the default schedule. The deploy workflow embeds it in the pushed image as the `com.cloudtak.capabilities` OCI annotation.
 ### GitHub Actions Setup
 
 The workflow uses GitHub variables and secrets to make it reusable across different ETL repositories.
