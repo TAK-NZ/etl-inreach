@@ -10,6 +10,9 @@
 
 ## Version History
 
+### v1.4.1 - 2026-11-24
+- :arrow_up: Update `@tak-ps/etl` to `^11.4.0`. CloudTAK v14 requires ETLs to be on ETL-Base v11 or higher. v11 publishes Output schemas as named schemas, so this task needed no change for that, and the release also works with CloudTAK v13
+- :arrow_up: Update the other dependencies within their existing ranges, which clears the `npm audit --production` findings that the deploy workflow checks
 ### v1.4.0 - 2026-10-07
 - :arrow_up: Raise the `@tak-ps/etl` range from `^10.8.0` to `^10.22.2`, satisfying the `>= 10.13.0` requirement for manifest-based capabilities (the lockfile already resolved 10.22.2). `task.ts` was re-checked against the 10.22.2 API (`Task.init`, `handler`, `local`, `DataFlowType`, `InvocationType`, `SchemaType`) and needed no changes. `npm update` changed nothing further and `npm audit` reports 0 vulnerabilities
 - :pencil2: `capabilities.json` was re-checked against the actual API usage in `task.ts` and is unchanged. `feature:submit` remains the only permission: only `submit()` is permission gated, while `env()`, `ephemeral()` and `setEphemeral()` are not, and the Garmin request uses the global `fetch` rather than `this.fetch`
